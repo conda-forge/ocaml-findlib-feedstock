@@ -1,5 +1,5 @@
 {% set name = "ocaml-findlib" %}
-{% set version = "1.8.1" %}
+{% set version = "1.9.4" %}
 
 package:
   name: {{ name|lower }}
@@ -7,11 +7,11 @@ package:
 
 source:
   url: http://download.camlcity.org/download/findlib-{{ version }}.tar.gz
-  sha256: 8e85cfa57e8745715432df3116697c8f41cb24b5ec16d1d5acd25e0196d34303
+  sha256: 20fecdbfc0cc8c8f3779e81f1fb91a2c5eaff421037679d4c64ab14a32e8f2ee
 
 build:
   number: 0
-  skip: True  # [win]
+  skip: true  # [win]
 
 requirements:
   build:
@@ -30,7 +30,7 @@ about:
   license: MIT
   license_family: MIT
   license_file: LICENSE
-  summary: 'opam is a source-based package manager for OCaml'
+  summary: opam is a source-based package manager for OCaml
   doc_url: http://projects.camlcity.org/projects/dl/findlib-{{ version }}/doc/guide-html/index.html
   dev_url: https://github.com/ocaml/opam
 
