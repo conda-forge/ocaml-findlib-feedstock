@@ -16,6 +16,7 @@ build:
 requirements:
   build:
     - m4
+    - make
   host:
     - ocaml
   run:
