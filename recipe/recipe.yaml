@@ -1,0 +1,136 @@
+context:
+  name: ocaml-findlib
+  version: 1.9.8
+  library: ${{ "Library/" if not unix }}
+  m2: ${{ "m2-" if not unix }}
+  sh: ${{ "sh" if unix else "bat" }}
+
+package:
+  name: ocaml-findlib
+  version: ${{ version }}
+
+source:
+  url: http://download.camlcity.org/download/findlib-${{ version }}.tar.gz
+  sha256: 662c910f774e9fee3a19c4e057f380581ab2fc4ee52da4761304ac9c31b8869d
+
+build:
+  number: 0
+  prefix_detection:
+    force_file_type:
+      text:
+        - ${{ library }}lib/ocaml/site-lib/findlib/Makefile.config
+        - ${{ library }}lib/ocaml/topfind
+        - ${{ library }}etc/findlib.conf
+    ignore:
+      # Only ignore bytecode files (binary format, relocation corrupts them)
+      - ${{ library }}lib/ocaml/site-lib/**/*.cma
+      - ${{ library }}lib/ocaml/site-lib/**/*.cmi
+      - ${{ library }}lib/ocaml/site-lib/**/*.cmx
+      - ${{ library }}lib/ocaml/site-lib/**/*.cmt
+      - ${{ library }}lib/ocaml/site-lib/**/*.cmti
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ stdlib('c') }}
+    - ${{ m2 }}bash >=5.2
+    - ${{ m2 }}make
+    - ${{ m2 }}sed
+    - ${{ m2 }}grep
+    - ocaml >=5.3.0
+    - if: osx
+      then:
+        - lld
+        - llvm-tools
+  run_constraints:
+    - ocaml >=5.3.0
+
+tests:
+  - package_contents:
+      strict: true
+      bin:
+        - ocamlfind
+      files:
+        - ${{ library }}etc/findlib.conf
+        - ${{ library }}lib/ocaml/site-lib/bytes/META
+        - ${{ library }}lib/ocaml/site-lib/findlib/META
+        - ${{ library }}lib/ocaml/site-lib/findlib/Makefile.config
+        - ${{ library }}lib/ocaml/site-lib/findlib/Makefile.packages
+        - ${{ library }}lib/ocaml/site-lib/findlib/findlib.cma
+        - ${{ library }}lib/ocaml/site-lib/findlib/findlib.cmxa
+        - ${{ library }}lib/ocaml/site-lib/findlib/findlib_top.cma
+        - ${{ library }}lib/ocaml/site-lib/findlib/findlib*
+        - ${{ library }}lib/ocaml/site-lib/findlib/fl*
+        - ${{ library }}lib/ocaml/site-lib/findlib/ocaml_args.cmi
+        - ${{ library }}lib/ocaml/site-lib/findlib/topfind.cmi
+        - ${{ library }}lib/ocaml/site-lib/findlib/topfind.mli
+        - ${{ library }}share/man/man1/ocamlfind.1
+        - ${{ library }}share/man/man5/META.5
+        - ${{ library }}share/man/man5/findlib.conf.5
+        - ${{ library }}share/man/man5/site-lib.5
+        - ${{ library }}lib/ocaml/topfind
+
+        - etc/conda/activate.d/ocaml-findlib_activate.${{ sh }}
+        - etc/conda/deactivate.d/ocaml-findlib_deactivate.${{ sh }}
+        - etc/conda/test-files/*
+        
+  # Cross-compilation tests (Linux, run via QEMU emulation)
+  - if: unix and (build_platform != target_platform)
+    then:
+      script:
+        - bash testing/test_cross.sh
+      requirements:
+        run:
+          - file
+          - ocaml
+      files:
+        recipe:
+          - testing/test_cross.sh
+
+  # Native Unix tests (Linux/macOS, full test suite)
+  - if: unix and (build_platform == target_platform)
+    then:
+      script:
+        - bash testing/test_native.sh
+      requirements:
+        run:
+          - ${{ c_compiler }}_impl_${{ target_platform }}
+          - ${{ m2 }}grep
+          - ocaml
+          - if: osx
+            then:
+              - lld
+              - llvm-tools
+      files:
+        recipe:
+          - testing/test_native.sh
+
+  # non-unix tests (native Windows batch)
+  - if: not unix
+    then:
+      script:
+        - testing/test_non-unix.bat
+      requirements:
+        run:
+          - ${{ c_compiler }}_impl_${{ target_platform }}
+          - binutils
+          - ocaml
+      files:
+        recipe:
+          - testing/test_non-unix.bat
+
+about:
+  homepage: http://projects.camlcity.org/projects/findlib.html
+  license: MIT
+  license_family: MIT
+  license_file: LICENSE
+  summary: 'opam is a source-based package manager for OCaml'
+  documentation: http://projects.camlcity.org/projects/dl/findlib-{{ version }}/doc/guide-html/index.html
+  repository: https://github.com/ocaml/opam
+
+extra:
+  recipe-maintainers:
+    - dslarm
+    - isuruf
+    - slel
+    - MementoRC
