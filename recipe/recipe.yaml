@@ -105,19 +105,18 @@ tests:
         recipe:
           - testing/test_native.sh
 
-  # non-unix tests (native Windows batch)
+  # non-unix tests (Python - cross-platform, robust)
   - if: not unix
     then:
       script:
-        - testing/test_non-unix.bat
+        - python testing/test-findlib.py
       requirements:
         run:
-          - ${{ c_compiler }}_impl_${{ target_platform }}
-          - binutils
-          - ocaml
+          - python >=3.9
+          - ocaml >=5.3.0
       files:
         recipe:
-          - testing/test_non-unix.bat
+          - testing/test-findlib.py
 
 about:
   homepage: http://projects.camlcity.org/projects/findlib.html
