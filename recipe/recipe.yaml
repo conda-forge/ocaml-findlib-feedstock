@@ -37,7 +37,7 @@ requirements:
     - ${{ m2 }}make
     - ${{ m2 }}sed
     - ${{ m2 }}grep
-    - ocaml >=5.3.0
+    - ocaml >=5.3.0 *_12
     - if: osx
       then:
         - lld

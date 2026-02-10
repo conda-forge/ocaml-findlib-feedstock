@@ -1,39 +1,96 @@
 # ==============================================================================
-# This file contains all reusable helper functions for the opam build process.
+# OCaml-findlib Build Helper Functions
+# ==============================================================================
+# This file contains all reusable helper functions for the build process.
 # Sourced by build.sh for cleaner organization.
+# ==============================================================================
+
+# ==============================================================================
+# HELPER FUNCTIONS - Error Handling & Utilities
+# ==============================================================================
+
+warn() {
+  echo "WARNING: $*" >&2
+}
+
+fail() {
+  echo "ERROR: $*" >&2
+  exit 1
+}
+
+try_or_warn() {
+  local msg="${1}"
+  shift
+  "$@" 2>/dev/null || warn "${msg}"
+}
+
+try_or_fail() {
+  local msg="${1}"
+  shift
+  "$@" || fail "${msg}"
+}
+
+create_wrapper_script() {
+  local wrapper_path="${1}"
+  local target_binary="${2}"
+  local extra_args="${3:-}"
+
+  cat > "${wrapper_path}" << WRAPPER_EOF
+#!/bin/bash
+exec "${target_binary}" ${extra_args} "\$@"
+WRAPPER_EOF
+  chmod +x "${wrapper_path}"
+  echo "  Created wrapper: ${wrapper_path} -> ${target_binary}"
+}
+
+# ==============================================================================
+# PLATFORM DETECTION
 # ==============================================================================
 
 is_cross_compile() { [[ "${CONDA_BUILD_CROSS_COMPILATION:-}" == "1" ]]; }
 is_macos() { [[ "${target_platform}" == "osx-"* ]]; }
 is_linux() { [[ "${target_platform}" == "linux-"* ]]; }
+is_linux_cross() { [[ "${target_platform}" == *"-aarch64" ]] || [[ "${target_platform}" == *"-ppc64le" ]] || [[ "${target_platform}" == *"-riscv64" ]]; }
 is_non_unix() { [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; }
+build_is_macos() { [[ "${build_platform:-${target_platform}}" == "osx-"* ]]; }
 
 # Convenience wrappers for readability
-get_target_c_compiler() { get_compiler "${CONDA_TOOLCHAIN_HOST:-}"; }
-get_build_c_compiler() { get_compiler "${CONDA_TOOLCHAIN_BUILD:-}"; }
+get_target_c_compiler() { get_compiler "c" "${CONDA_TOOLCHAIN_HOST:-}"; }
+get_target_cxx_compiler() { get_compiler "cxx" "${CONDA_TOOLCHAIN_HOST:-}"; }
+get_build_c_compiler() { get_compiler "c" "${CONDA_TOOLCHAIN_BUILD:-}"; }
+get_build_cxx_compiler() { get_compiler "cxx" "${CONDA_TOOLCHAIN_BUILD:-}"; }
 
 # Get compiler path based on type and toolchain
 # Usage: get_compiler "c" [toolchain_prefix]  -> returns gcc/clang path
 #        get_compiler "cxx" [toolchain_prefix] -> returns g++/clang++ path
 get_compiler() {
-  local toolchain_prefix="${1:-}"
+  local compiler_type="${1}"  # "c" or "cxx"
+  local toolchain_prefix="${2:-}"
 
-  local c_compiler
+  local c_compiler cxx_compiler
   if [[ -n "${toolchain_prefix}" ]]; then
     if [[ "${toolchain_prefix}" == *"apple-darwin"* ]]; then
       c_compiler="${toolchain_prefix}-clang"
+      cxx_compiler="${toolchain_prefix}-clang++"
     else
       c_compiler="${toolchain_prefix}-gcc"
+      cxx_compiler="${toolchain_prefix}-g++"
     fi
   else
     if is_macos; then
       c_compiler="clang"
+      cxx_compiler="clang++"
     else
       c_compiler="gcc"
+      cxx_compiler="g++"
     fi
   fi
 
-  echo "${c_compiler}"
+  if [[ "${compiler_type}" == "c" ]]; then
+    echo "${c_compiler}"
+  else
+    echo "${cxx_compiler}"
+  fi
 }
 
 # ==============================================================================
@@ -43,7 +100,7 @@ get_compiler() {
 swap_ocaml_compilers() {
   echo "  Swapping OCaml compilers to cross-compilers..."
   pushd "${BUILD_PREFIX}/bin" > /dev/null
-    for tool in ocamlc ocamldep ocamlopt ocamlobjinfo; do
+    for tool in ocamlc ocamldep ocamlopt ocamlobjinfo ocamlmklib; do
       if [[ -f "${tool}" ]] || [[ -L "${tool}" ]]; then
         mv "${tool}" "${tool}.build"
         ln -sf "${CONDA_TOOLCHAIN_HOST}-${tool}" "${tool}"
@@ -57,8 +114,9 @@ swap_ocaml_compilers() {
 }
 
 setup_cross_c_compilers() {
-  echo "  Setting up C cross-compiler symlinks..."
+  echo "  Setting up C/C++ cross-compiler symlinks..."
   local target_cc="$(get_target_c_compiler)"
+  local target_cxx="$(get_target_cxx_compiler)"
 
   pushd "${BUILD_PREFIX}/bin" > /dev/null
     for tool in gcc cc; do
@@ -67,6 +125,13 @@ setup_cross_c_compilers() {
       fi
       ln -sf "${target_cc}" "${tool}"
       echo "    Linked ${tool} -> ${target_cc}"
+    done
+    for tool in g++ c++; do
+      if [[ -f "${tool}" ]] || [[ -L "${tool}" ]]; then
+        mv "${tool}" "${tool}.build" 2>/dev/null || true
+      fi
+      ln -sf "${target_cxx}" "${tool}"
+      echo "    Linked ${tool} -> ${target_cxx}"
     done
   popd > /dev/null
 }
@@ -88,84 +153,48 @@ configure_cross_environment() {
   export CONDA_OCAML_LD="${CONDA_TOOLCHAIN_HOST}-ld"
 
   echo "    Cross-compiler environment:"
-  echo "      CC=${CC}, AR=${AR}, CONDA_OCAML_CC=${CONDA_OCAML_CC}"
+  echo "      CC=${CC}, CXX=${CXX:-}, AR=${AR}"
+  echo "      CONDA_OCAML_CC=${CONDA_OCAML_CC}"
 
   # Set QEMU_LD_PREFIX for binfmt_misc/QEMU to find aarch64 dynamic linker
   export QEMU_LD_PREFIX="${BUILD_PREFIX}/${CONDA_TOOLCHAIN_HOST}/sysroot"
 
-  # Get the cross-compiled OCaml stdlib path from the swapped ocamlc
-  local cross_ocaml_lib
-  cross_ocaml_lib="$(ocamlc -where)"
-  echo "    ocamlc -where reports: ${cross_ocaml_lib}"
-
-  # CRITICAL DEBUG: Verify the architecture of runtime libraries using readelf
-  echo "    Verifying libcamlrun.a architecture (cross-compiled, for ocamlc -custom):"
-  if [[ -f "${cross_ocaml_lib}/libcamlrun.a" ]]; then
-    # Extract first object and check its ELF header
-    local tmpdir
-    tmpdir="$(mktemp -d)"
-    pushd "${tmpdir}" > /dev/null
-    ar x "${cross_ocaml_lib}/libcamlrun.a" 2>/dev/null
-    local first_obj
-    first_obj="$(ls *.o 2>/dev/null | head -1)"
-    if [[ -n "${first_obj}" ]]; then
-      echo "    First object file: ${first_obj}"
-      readelf -h "${first_obj}" 2>&1 | grep -E "Class:|Machine:" || true
-    fi
-    popd > /dev/null
-    rm -rf "${tmpdir}"
-  else
-    echo "    WARNING: libcamlrun.a not found at ${cross_ocaml_lib}"
-  fi
-
-  # Also check libasmrun.a (native-code runtime, for ocamlopt)
-  echo "    Verifying libasmrun.a architecture (cross-compiled, for ocamlopt):"
-  if [[ -f "${cross_ocaml_lib}/libasmrun.a" ]]; then
-    local tmpdir
-    tmpdir="$(mktemp -d)"
-    pushd "${tmpdir}" > /dev/null
-    ar x "${cross_ocaml_lib}/libasmrun.a" 2>/dev/null
-    local first_obj
-    first_obj="$(ls *.o 2>/dev/null | head -1)"
-    if [[ -n "${first_obj}" ]]; then
-      echo "    First object file: ${first_obj}"
-      readelf -h "${first_obj}" 2>&1 | grep -E "Class:|Machine:" || true
-    fi
-    popd > /dev/null
-    rm -rf "${tmpdir}"
-  else
-    echo "    WARNING: libasmrun.a not found at ${cross_ocaml_lib}"
-  fi
-
-  # Show native stdlib for comparison
-  echo "    Native (build) stdlib path: ${BUILD_PREFIX}/lib/ocaml"
-  echo "    Verifying libcamlrun.a architecture (native):"
-  if [[ -f "${BUILD_PREFIX}/lib/ocaml/libcamlrun.a" ]]; then
-    local tmpdir
-    tmpdir="$(mktemp -d)"
-    pushd "${tmpdir}" > /dev/null
-    ar x "${BUILD_PREFIX}/lib/ocaml/libcamlrun.a" 2>/dev/null
-    local first_obj
-    first_obj="$(ls *.o 2>/dev/null | head -1)"
-    if [[ -n "${first_obj}" ]]; then
-      echo "    First object file: ${first_obj}"
-      readelf -h "${first_obj}" 2>&1 | grep -E "Class:|Machine:" || true
-    fi
-    popd > /dev/null
-    rm -rf "${tmpdir}"
-  fi
-
   # Set OCAMLLIB, LIBRARY_PATH and LDFLAGS so ocamlmklib can find cross-compiled OCaml runtime
+  # OCAMLLIB is CRITICAL - ocamlmklib uses it to find libasmrun.a and other runtime libs
+  local cross_ocaml_lib="${BUILD_PREFIX}/lib/ocaml-cross-compilers/${CONDA_TOOLCHAIN_HOST}/lib/ocaml"
   if [[ -d "${cross_ocaml_lib}" ]]; then
     export OCAMLLIB="${cross_ocaml_lib}"
     export LIBRARY_PATH="${cross_ocaml_lib}:${PREFIX}/lib:${LIBRARY_PATH:-}"
     export LDFLAGS="-L${cross_ocaml_lib} -L${PREFIX}/lib ${LDFLAGS:-}"
-    echo "    Set OCAMLLIB: ${OCAMLLIB}"
+    echo "    Set OCAMLLIB for ocamlmklib: ${OCAMLLIB}"
     echo "    Set LIBRARY_PATH: ${cross_ocaml_lib}"
     echo "    Set LDFLAGS: ${LDFLAGS}"
+
+    # OCAMLPATH strategy for cross-compilation:
+    # - Cross path FIRST: so compiler finds cross-compiled libraries for linking
+    # - Native path SECOND: so dune's runtime can load native stub libraries (dllunixbyt.so)
+    # This ordering ensures compilation uses cross libs while dune can still run
+    local native_ocaml_lib="${BUILD_PREFIX}/lib/ocaml"
+    export OCAMLPATH="${cross_ocaml_lib}:${native_ocaml_lib}"
+    echo "    Set OCAMLPATH (cross-first, native-fallback): ${OCAMLPATH}"
+
+    # CAML_LD_LIBRARY_PATH: OCaml's stub library search path (takes precedence over OCAMLPATH)
+    # OCaml bytecode runtime (used by dune) dynamically loads .so stub files.
+    # Dune is native x86_64, so it needs native .so files, not cross-compiled aarch64 ones.
+    # CAML_LD_LIBRARY_PATH is checked BEFORE OCAMLPATH-derived stublibs directories.
+    local native_stublibs="${native_ocaml_lib}/stublibs"
+    export CAML_LD_LIBRARY_PATH="${native_stublibs}"
+    echo "    Set CAML_LD_LIBRARY_PATH (native stublibs): ${CAML_LD_LIBRARY_PATH}"
+
+    # Also set LD_LIBRARY_PATH as fallback (for dlopen() after OCaml finds the library)
+    export LD_LIBRARY_PATH="${native_stublibs}:${LD_LIBRARY_PATH:-}"
+    echo "    Set LD_LIBRARY_PATH (native stublibs): ${native_stublibs}"
+
     # Debug: show what's in the cross-compiler lib
     echo "    Cross-compiled OCaml runtime files:"
     ls -la "${cross_ocaml_lib}/"*.a 2>/dev/null | head -5 || echo "      (no .a files found)"
+    echo "    Cross-compiled OCaml packages:"
+    ls -d "${cross_ocaml_lib}"/*/ 2>/dev/null | head -10 || echo "      (no subdirectories found)"
   fi
 }
 
@@ -189,4 +218,20 @@ patch_ocaml_makefile_config() {
   else
     echo "    WARNING: OCaml Makefile.config not found at ${ocaml_config}"
   fi
+}
+
+# NOTE: create_macos_ocamlmklib_wrapper is no longer needed.
+# ocaml >=5.3.0 build_12+ includes patch 0002-ocamlmklib-conda-env-vars.patch
+# which makes ocamlmklib read CONDA_OCAML_AR and CONDA_OCAML_MKDLL env vars.
+# The ${target}-ocamlmklib wrapper sets these vars and handles macOS -undefined.
+
+clear_build_caches() {
+  echo "  Clearing build caches for cross-compilation..."
+
+  # Clear any _build directories from previous builds
+  rm -rf "${SRC_DIR}/_build" 2>/dev/null || true
+
+  # Remove any object files from previous builds
+  find "${SRC_DIR}" -name "*.o" -delete 2>/dev/null || true
+  echo "  Build caches cleared"
 }
