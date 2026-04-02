@@ -17,6 +17,12 @@ fi
 
 source "${RECIPE_DIR}/building/build_functions.sh"
 
+# macOS: allow weak symbols (e.g. __darwin_check_fd_set_overflow) to be
+# resolved at runtime. lld is strict about this during -custom bytecode linking.
+if is_macos; then
+  export LDFLAGS="${LDFLAGS:-} -Wl,-undefined,dynamic_lookup"
+fi
+
 if is_non_unix; then
   LIBDIR="${PREFIX}/Library"
 else
@@ -36,25 +42,18 @@ sed -i 's#let ocaml_stdlib = "@STDLIB@";;#let ocaml_stdlib = match Sys.getenv_op
 
 if is_cross_compile; then
   # CROSS-COMPILATION STRATEGY:
-  # The cross-compilers package bundles native OCaml alongside cross-compilers.
-  # - ocamlfind is a BUILD TOOL - must be built with NATIVE compiler (runs on x86_64)
-  # - Libraries (.cma, .cmxa) should be built with CROSS compiler (for aarch64 target)
+  # ocaml_<arch> packages provide cross-compiler wrappers that automatically
+  # set OCAMLLIB, CONDA_OCAML_CC, etc. We only need to swap bare compiler
+  # names so findlib's Makefile finds the cross-compilers.
   #
-  # libcamlrun.a is x86_64 (for native bytecode runtime) - this is correct!
-  # libasmrun.a is aarch64 (for cross-compiled native code) - this is correct!
+  # - ocamlfind is a BUILD TOOL - must be built with NATIVE compiler
+  # - Libraries (.cma, .cmxa) should be built with CROSS compiler
 
-  echo "=== STEP 1: Build ocamlfind with NATIVE compiler (runs on build machine) ==="
-  # Don't swap compilers yet - use native ocaml to build the tool
+  echo "=== STEP 1: Build ocamlfind with NATIVE compiler ==="
   make all
 
   echo "=== STEP 2: Build cross-compiled libraries ==="
-  # Now swap to cross-compilers for building target libraries
   swap_ocaml_compilers
-  setup_cross_c_compilers
-  configure_cross_environment
-  patch_ocaml_makefile_config
-
-  # Build native-code libraries for target (uses aarch64 libasmrun.a)
   make opt CC="${CC}" AR="${AR}" RANLIB="${RANLIB}"
 
   make install

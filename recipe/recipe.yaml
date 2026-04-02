@@ -1,8 +1,8 @@
 context:
   name: ocaml-findlib
   version: 1.9.8
-  library: ${{ "Library/" if not unix }}
-  m2: ${{ "m2-" if not unix }}
+  library: ${{ "Library/" if not unix else "" }}
+  m2: ${{ "m2-" if not unix else "" }}
   sh: ${{ "sh" if unix else "bat" }}
 
 package:
@@ -37,13 +37,16 @@ requirements:
     - ${{ m2 }}make
     - ${{ m2 }}sed
     - ${{ m2 }}grep
-    - ocaml >=5.3.0 *_12
+    - ocaml_${{ build_platform }} >=5.4.0
+    - if: build_platform != target_platform
+      then:
+        - ocaml_${{ target_platform }} >=5.4.0
     - if: osx
       then:
         - lld
         - llvm-tools
   run_constraints:
-    - ocaml >=5.3.0
+    - ocaml >=5.4.0
 
 tests:
   - package_contents:
@@ -82,7 +85,7 @@ tests:
       requirements:
         run:
           - file
-          - ocaml
+          - ocaml-compiler
       files:
         recipe:
           - testing/test_cross.sh
@@ -96,7 +99,7 @@ tests:
         run:
           - ${{ c_compiler }}_impl_${{ target_platform }}
           - ${{ m2 }}grep
-          - ocaml
+          - ocaml-compiler
           - if: osx
             then:
               - lld
@@ -113,7 +116,7 @@ tests:
       requirements:
         run:
           - python >=3.9
-          - ocaml >=5.3.0
+          - ocaml-compiler
       files:
         recipe:
           - testing/test-findlib.py
@@ -123,9 +126,9 @@ about:
   license: MIT
   license_family: MIT
   license_file: LICENSE
-  summary: 'opam is a source-based package manager for OCaml'
-  documentation: http://projects.camlcity.org/projects/dl/findlib-{{ version }}/doc/guide-html/index.html
-  repository: https://github.com/ocaml/opam
+  summary: 'OCaml library manager and package finder'
+  documentation: http://projects.camlcity.org/projects/dl/findlib-${{ version }}/doc/guide-html/index.html
+  repository: https://github.com/ocaml/ocamlfind
 
 extra:
   recipe-maintainers:

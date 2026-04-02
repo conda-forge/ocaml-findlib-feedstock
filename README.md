@@ -7,11 +7,11 @@ Home: http://projects.camlcity.org/projects/findlib.html
 
 Package license: MIT
 
-Summary: opam is a source-based package manager for OCaml
+Summary: OCaml library manager and package finder
 
-Development: https://github.com/ocaml/opam
+Development: https://github.com/ocaml/ocamlfind
 
-Documentation: http://projects.camlcity.org/projects/dl/findlib-%7B%7B%20version%20%7D%7D/doc/guide-html/index.html
+Documentation: http://projects.camlcity.org/projects/dl/findlib-1.9.8/doc/guide-html/index.html
 
 Current build status
 ====================
