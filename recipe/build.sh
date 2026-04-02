@@ -17,12 +17,6 @@ fi
 
 source "${RECIPE_DIR}/building/build_functions.sh"
 
-# macOS: allow weak symbols (e.g. __darwin_check_fd_set_overflow) to be
-# resolved at runtime. lld is strict about this during -custom bytecode linking.
-if is_macos; then
-  export LDFLAGS="${LDFLAGS:-} -Wl,-undefined,dynamic_lookup"
-fi
-
 if is_non_unix; then
   LIBDIR="${PREFIX}/Library"
 else
@@ -53,8 +47,18 @@ if is_cross_compile; then
   make all
 
   echo "=== STEP 2: Build cross-compiled libraries ==="
+  echo "  DEBUG: CONDA_OCAML_* environment variables:"
+  env | grep CONDA_OCAML || echo "  DEBUG: No CONDA_OCAML_* variables found"
+  echo "  DEBUG: target_platform=${target_platform:-unset}"
+  echo "  DEBUG: build_platform=${build_platform:-unset}"
   swap_ocaml_compilers
-  make opt CC="${CC}" AR="${AR}" RANLIB="${RANLIB}"
+  # CC/AR/RANLIB may not be set without compiler('c') activation.
+  # OCaml cross-compiler packages set CONDA_OCAML_${target_id}_CC etc.
+  target_id="${target_platform//-/_}"
+  eval "cross_cc=\${CONDA_OCAML_${target_id}_CC}"
+  eval "cross_ar=\${CONDA_OCAML_${target_id}_AR}"
+  eval "cross_ranlib=\${CONDA_OCAML_${target_id}_RANLIB}"
+  make opt CC="${CC:-${cross_cc}}" AR="${AR:-${cross_ar}}" RANLIB="${RANLIB:-${cross_ranlib}}"
 
   make install
 else

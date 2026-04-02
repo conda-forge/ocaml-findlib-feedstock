@@ -62,17 +62,41 @@ build_is_macos() { [[ "${build_platform:-${target_platform}}" == "osx-"* ]]; }
 # names so findlib's Makefile finds the cross-compilers.
 # ==============================================================================
 
+get_cross_prefix() {
+  # 3-tier fallback for cross-compiler prefix:
+  # 1. CONDA_TOOLCHAIN_HOST (set on Linux by GCC activation)
+  # 2. HOST (conda-build host triplet)
+  # 3. Auto-discover from *-ocamlc binaries in BUILD_PREFIX/bin
+  if [[ -n "${CONDA_TOOLCHAIN_HOST:-}" ]]; then
+    echo "${CONDA_TOOLCHAIN_HOST}"
+  elif [[ -n "${HOST:-}" ]]; then
+    echo "${HOST}"
+  else
+    local cross_ocamlc
+    cross_ocamlc=$(find "${BUILD_PREFIX}/bin" -name '*-ocamlc' ! -name 'ocamlc' | head -1)
+    if [[ -n "${cross_ocamlc}" ]]; then
+      basename "${cross_ocamlc}" | sed 's/-ocamlc$//'
+    else
+      echo "ERROR: Cannot determine cross-compiler prefix" >&2
+      return 1
+    fi
+  fi
+}
+
 swap_ocaml_compilers() {
   echo "  Swapping OCaml compilers to cross-compilers..."
+  local cross_prefix
+  cross_prefix=$(get_cross_prefix)
+  echo "  Cross-compiler prefix: ${cross_prefix}"
   pushd "${BUILD_PREFIX}/bin" > /dev/null
     for tool in ocamlc ocamldep ocamlopt ocamlobjinfo ocamlmklib; do
       if [[ -f "${tool}" ]] || [[ -L "${tool}" ]]; then
         mv "${tool}" "${tool}.build"
-        ln -sf "${CONDA_TOOLCHAIN_HOST}-${tool}" "${tool}"
+        ln -sf "${cross_prefix}-${tool}" "${tool}"
       fi
       if [[ -f "${tool}.opt" ]] || [[ -L "${tool}.opt" ]]; then
         mv "${tool}.opt" "${tool}.opt.build"
-        ln -sf "${CONDA_TOOLCHAIN_HOST}-${tool}.opt" "${tool}.opt"
+        ln -sf "${cross_prefix}-${tool}.opt" "${tool}.opt"
       fi
     done
   popd > /dev/null

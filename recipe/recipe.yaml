@@ -1,4 +1,5 @@
 context:
+  build_number: 0
   name: ocaml-findlib
   version: 1.9.8
   library: ${{ "Library/" if not unix else "" }}
@@ -14,7 +15,7 @@ source:
   sha256: 662c910f774e9fee3a19c4e057f380581ab2fc4ee52da4761304ac9c31b8869d
 
 build:
-  number: 0
+  number: ${{ build_number }}
   prefix_detection:
     force_file_type:
       text:
@@ -31,22 +32,21 @@ build:
 
 requirements:
   build:
-    - ${{ compiler('c') }}
-    - ${{ stdlib('c') }}
+    - ${{ compiler('ocaml') }}
+    - ocaml_${{ build_platform }} >=5.4.0 *_5   # Temporary fix until compiler() installs native
     - ${{ m2 }}bash >=5.2
     - ${{ m2 }}make
     - ${{ m2 }}sed
     - ${{ m2 }}grep
-    - ocaml_${{ build_platform }} >=5.4.0
-    - if: build_platform != target_platform
-      then:
-        - ocaml_${{ target_platform }} >=5.4.0
-    - if: osx
-      then:
-        - lld
-        - llvm-tools
+    # - if: build_platform != target_platform
+    #   then:
+    #     - ocaml_${{ target_platform }} >=5.4.0
+    # - if: osx
+    #   then:
+    #    - lld
+    #    - llvm-tools
   run_constraints:
-    - ocaml >=5.4.0
+    - ocaml_${{ target_platform }} >=5.4.0 *_5
 
 tests:
   - package_contents:
