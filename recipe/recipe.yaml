@@ -33,7 +33,7 @@ build:
 requirements:
   build:
     - ${{ compiler('ocaml') }}
-    - ocaml_${{ build_platform }} >=5.4.0 *_5   # Temporary fix until compiler() installs native
+    - ocaml_${{ build_platform }} >=5.4.0 *_6   # Temporary fix until compiler() installs native
     - ${{ m2 }}bash >=5.2
     - ${{ m2 }}make
     - ${{ m2 }}sed
@@ -46,7 +46,7 @@ requirements:
     #    - lld
     #    - llvm-tools
   run_constraints:
-    - ocaml_${{ target_platform }} >=5.4.0 *_5
+    - ocaml_${{ target_platform }} >=5.4.0 *_6
 
 tests:
   - package_contents:

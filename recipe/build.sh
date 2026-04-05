@@ -53,12 +53,8 @@ if is_cross_compile; then
   echo "  DEBUG: build_platform=${build_platform:-unset}"
   swap_ocaml_compilers
   # CC/AR/RANLIB may not be set without compiler('c') activation.
-  # OCaml cross-compiler packages set CONDA_OCAML_${target_id}_CC etc.
-  target_id="${target_platform//-/_}"
-  eval "cross_cc=\${CONDA_OCAML_${target_id}_CC}"
-  eval "cross_ar=\${CONDA_OCAML_${target_id}_AR}"
-  eval "cross_ranlib=\${CONDA_OCAML_${target_id}_RANLIB}"
-  make opt CC="${CC:-${cross_cc}}" AR="${AR:-${cross_ar}}" RANLIB="${RANLIB:-${cross_ranlib}}"
+  # OCaml activation scripts set CONDA_OCAML_CC/AR/RANLIB unconditionally.
+  make opt CC="${CC:-${CONDA_OCAML_CC}}" AR="${AR:-${CONDA_OCAML_AR}}" RANLIB="${RANLIB:-${CONDA_OCAML_RANLIB}}"
 
   make install
 else
