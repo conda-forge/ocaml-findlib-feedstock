@@ -7,4 +7,4 @@ ocaml_compiler:
 ocaml_compiler_version:
 - 5.4.0
 target_platform:
-- win-64
+- win-arm64
