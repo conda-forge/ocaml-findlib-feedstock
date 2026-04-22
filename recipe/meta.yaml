@@ -1,5 +1,5 @@
 {% set name = "ocaml-findlib" %}
-{% set version = "1.8.1" %}
+{% set version = "1.9.8" %}
 
 package:
   name: {{ name|lower }}
@@ -7,11 +7,11 @@ package:
 
 source:
   url: http://download.camlcity.org/download/findlib-{{ version }}.tar.gz
-  sha256: 8e85cfa57e8745715432df3116697c8f41cb24b5ec16d1d5acd25e0196d34303
+  sha256: 662c910f774e9fee3a19c4e057f380581ab2fc4ee52da4761304ac9c31b8869d
 
 build:
-  number: 1
-  skip: True  # [win]
+  number: 0
+  skip: true  # [win]
 
 requirements:
   build:
