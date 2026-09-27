@@ -43,7 +43,23 @@ requirements:
 
 tests:
   - script:
-      - ocamlfind install -help
+      # findlib.conf must resolve and point inside the prefix
+      - ocamlfind printconf
+      # the package registry must be readable
+      - ocamlfind list
+      # control: findlib's own META is always installed, so this must resolve
+      - ocamlfind query findlib
+      # subject: a META file findlib ships for an OCaml stdlib library
+      - ocamlfind query str
+      # end-to-end compile and link through the ocamlfind driver.
+      # ocamlc (bytecode) is deliberate: it needs no C linker, so the test
+      # environment stays at just ocaml-compiler.
+      - |
+        cat > test_link.ml <<'EOF'
+        let () = print_string (Str.global_replace (Str.regexp "a") "b" "aaa")
+        EOF
+      - ocamlfind ocamlc -package str -linkpkg test_link.ml -o test_link
+      - test "$(./test_link)" = "bbb"
     requirements:
       run:
         - ocaml-compiler
