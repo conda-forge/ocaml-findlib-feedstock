@@ -86,10 +86,10 @@ tests:
         run:
           - if: linux
             then:
-              - gcc_linux-64
+              - gcc_${{ target_platform }}
           - if: osx
             then:
-              - clang_osx-64
+              - clang_${{ target_platform }}
               - lld
               - llvm-tools
           - grep
