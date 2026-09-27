@@ -64,6 +64,40 @@ tests:
       run:
         - ocaml-compiler
 
+  # Cross-compilation tests (aarch64/ppc64le, run under emulation)
+  - if: unix and (build_platform != target_platform)
+    then:
+      script:
+        - bash testing/test_cross.sh
+      requirements:
+        run:
+          - file
+          - ocaml-compiler
+      files:
+        recipe:
+          - testing/test_cross.sh
+
+  # Native Unix tests (Linux/macOS): full driver, native codegen and topfind
+  - if: unix and (build_platform == target_platform)
+    then:
+      script:
+        - bash testing/test_native.sh
+      requirements:
+        run:
+          - if: linux
+            then:
+              - gcc_linux-64
+          - if: osx
+            then:
+              - clang_osx-64
+              - lld
+              - llvm-tools
+          - grep
+          - ocaml-compiler
+      files:
+        recipe:
+          - testing/test_native.sh
+
 about:
   homepage: http://projects.camlcity.org/projects/findlib.html
   license: MIT
