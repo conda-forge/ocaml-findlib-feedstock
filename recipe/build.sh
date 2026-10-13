@@ -25,10 +25,10 @@ if [[ -f "${BUILD_PREFIX}/lib/ocaml/topfind" ]]; then
 fi
 
 if [[ -n "${TOPFIND_SRC}" ]]; then
-  mv "${TOPFIND_SRC}" "${LIBDIR}/lib/ocaml/"
+  mv "${TOPFIND_SRC}" "${PREFIX}/lib/ocaml/"
 fi
 
-sed -i "s@${BUILD_PREFIX}@${PREFIX}@g" "${LIBDIR}"/etc/findlib.conf "${LIBDIR}"/lib/ocaml/site-lib/findlib/Makefile.config
+sed -i "s@${BUILD_PREFIX}@${PREFIX}@g" "${PREFIX}"/etc/findlib.conf "${PREFIX}"/lib/ocaml/site-lib/findlib/Makefile.config
 
 for CHANGE in "activate" "deactivate"
 do
