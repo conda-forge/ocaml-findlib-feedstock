@@ -19,9 +19,8 @@ make install
 
 # Move topfind to correct location and fix hardcoded paths
 # On Unix: topfind is at ${BUILD_PREFIX}/lib/ocaml/topfind
-TOPFIND_SRC=""
-if [[ -f "${BUILD_PREFIX}/lib/ocaml/topfind" ]]; then
-  TOPFIND_SRC="${BUILD_PREFIX}/lib/ocaml/topfind"
+TOPFIND_SRC="${BUILD_PREFIX}/lib/ocaml/topfind"
+if [[ -f "${TOPFIND_SRC}" ]]; then
   mv "${TOPFIND_SRC}" "${PREFIX}/lib/ocaml/"
 fi
 
