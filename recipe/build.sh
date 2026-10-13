@@ -22,9 +22,6 @@ make install
 TOPFIND_SRC=""
 if [[ -f "${BUILD_PREFIX}/lib/ocaml/topfind" ]]; then
   TOPFIND_SRC="${BUILD_PREFIX}/lib/ocaml/topfind"
-fi
-
-if [[ -n "${TOPFIND_SRC}" ]]; then
   mv "${TOPFIND_SRC}" "${PREFIX}/lib/ocaml/"
 fi
 
