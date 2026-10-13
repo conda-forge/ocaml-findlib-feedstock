@@ -17,13 +17,13 @@ IFS=$'\n\t'
 # 
 # source "${RECIPE_DIR}/building/build_functions.sh"
 
-LIBDIR="${PREFIX}"
+# LIBDIR="${PREFIX}"
 
 ./configure \
-  -bindir "${LIBDIR}"/bin \
-  -sitelib "${LIBDIR}"/lib/ocaml/site-lib \
-  -config "${LIBDIR}"/etc/findlib.conf \
-  -mandir "${LIBDIR}"/share/man || { cat ocargs.log; exit 1; }
+  -bindir "${PREFIX}"/bin \
+  -sitelib "${PREFIX}"/lib/ocaml/site-lib \
+  -config "${PREFIX}"/etc/findlib.conf \
+  -mandir "${PREFIX}"/share/man || { cat ocargs.log; exit 1; }
 
 # Patch findlib_config.mlp BEFORE compilation to use runtime env vars
 # This ensures both bytecode (.cma) and native (.cmxa) use dynamic paths
