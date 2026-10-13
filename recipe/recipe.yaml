@@ -32,7 +32,7 @@ build:
 
 requirements:
   build:
-    - ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.*
+    - ${{ compiler('ocaml') }}
     - ${{ stdlib("c") }}
     - bash >=5.2
     - make
