@@ -1,23 +1,33 @@
-./configure
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+./configure \
+  -bindir "${PREFIX}"/bin \
+  -sitelib "${PREFIX}"/lib/ocaml/site-lib \
+  -config "${PREFIX}"/etc/findlib.conf \
+  -mandir "${PREFIX}"/share/man || { cat ocargs.log; exit 1; }
+
+# Patch findlib_config.mlp BEFORE compilation to use runtime env vars
+# This ensures both bytecode (.cma) and native (.cmxa) use dynamic paths
+# Use Sys.getenv_opt with fallback to avoid crashes if OCAMLLIB not set
+sed -i 's#let ocaml_stdlib = "@STDLIB@";;#let ocaml_stdlib = match Sys.getenv_opt "OCAMLLIB" with Some v -> v | None -> failwith "OCAMLLIB environment variable not set";;#g' src/findlib/findlib_config.mlp
+
 make all
 make opt
 make install
 
-sed -i.bak 's/let config_file.*/let config_file = (Sys.getenv "OCAMLFIND_CONF");;/g' src/findlib/findlib_config.mlp
-sed -i.bak 's/let ocaml_stdlib.*/let ocaml_stdlib = (Sys.getenv "OCAMLLIB");;/g' src/findlib/findlib_config.mlp
+# Move topfind to correct location and fix hardcoded paths
+# On Unix: topfind is at ${BUILD_PREFIX}/lib/ocaml/topfind
+TOPFIND_SRC="${BUILD_PREFIX}/lib/ocaml/topfind"
+if [[ -f "${TOPFIND_SRC}" ]]; then
+  mv "${TOPFIND_SRC}" "${PREFIX}/lib/ocaml/"
+fi
 
-export OCAMLFIND_CONF=$PREFIX/etc/findlib.conf
-
-./configure
-make all
-make opt
-make install
-
-cp $OCAMLFIND_CONF findlib.conf
-sed "s@path=\"$OCAMLLIB/site-lib\"@path=\"$OCAMLLIB/site-lib:$OCAMLLIB\"@g" findlib.conf > $OCAMLFIND_CONF
+sed -i "s@${BUILD_PREFIX}@${PREFIX}@g" "${PREFIX}"/etc/findlib.conf "${PREFIX}"/lib/ocaml/site-lib/findlib/Makefile.config
 
 for CHANGE in "activate" "deactivate"
 do
-    mkdir -p "${PREFIX}/etc/conda/${CHANGE}.d"
-    cp "${RECIPE_DIR}/${CHANGE}.sh" "${PREFIX}/etc/conda/${CHANGE}.d/${PKG_NAME}_${CHANGE}.sh"
+  mkdir -p "${PREFIX}/etc/conda/${CHANGE}.d"
+  cp "${RECIPE_DIR}/scripts/${CHANGE}.sh" "${PREFIX}/etc/conda/${CHANGE}.d/${PKG_NAME}_${CHANGE}.sh"
 done
