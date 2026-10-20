@@ -1,7 +1,13 @@
 context:
-  build_number: 0
+  build_number: 1
   name: ocaml-findlib
   version: 1.9.8
+
+  # ocaml_win-64 ships gcc_* and vs2022_* at the same version/build; name the track.
+  c_toolchain: ${{ "" if unix else c_compiler ~ "_*" }}
+  library: ${{ "Library/" if not unix else "" }}
+  m2: ${{ "m2-" if not unix else "" }}
+  sh: ${{ "sh" if unix else "bat" }}
 
 package:
   name: ${{ name }}
@@ -13,40 +19,124 @@ source:
 
 build:
   number: ${{ build_number }}
-  skip:
-    - win
   prefix_detection:
     force_file_type:
       text:
-        - lib/ocaml/site-lib/findlib/Makefile.config
-        - lib/ocaml/topfind
-        - etc/findlib.conf
+        - ${{ library }}lib/ocaml/site-lib/findlib/Makefile.config
+        - ${{ library }}lib/ocaml/topfind
+        - ${{ library }}etc/findlib.conf
     ignore:
       # Only ignore bytecode files (binary format, relocation corrupts them)
-      - lib/ocaml/site-lib/**/*.cma
-      - lib/ocaml/site-lib/**/*.cmi
-      - lib/ocaml/site-lib/**/*.cmx
-      - lib/ocaml/site-lib/**/*.cmt
-      - lib/ocaml/site-lib/**/*.cmti
+      - ${{ library }}lib/ocaml/site-lib/**/*.cma
+      - ${{ library }}lib/ocaml/site-lib/**/*.cmi
+      - ${{ library }}lib/ocaml/site-lib/**/*.cmx
+      - ${{ library }}lib/ocaml/site-lib/**/*.cmt
+      - ${{ library }}lib/ocaml/site-lib/**/*.cmti
   script: build.sh
 
 requirements:
   build:
-    - ${{ compiler('ocaml') }}
-    - ${{ stdlib("c") }}
-    - bash >=5.2
-    - make
-    - sed
-    - grep
+    - ${{ compiler('ocaml') }} ${{ c_toolchain }}
+    - if: unix and build_platform != target_platform
+      then:
+        - ocaml_${{ build_platform }} ${{ ocaml_compiler_version }}.*
+    - if: not unix and c_compiler == "gcc"
+      then:
+        - ${{ stdlib("m2w64_c") }}
+      else:
+        - ${{ stdlib("c") }}
+    - ${{ m2 }}bash >=5.2
+    - ${{ m2 }}make
+    - ${{ m2 }}sed
+    - ${{ m2 }}grep
+  host:
+    - ocaml ${{ ocaml_compiler_version }}.*
+    - if: not unix
+      then:
+        - ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.* ${{ c_toolchain }}
   run_constraints:
-    - ocaml_${{ target_platform }} >=${{ ocaml_compiler_version }}
+    - if: not unix
+      then:
+        - ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.* ${{ c_toolchain }}
 
 tests:
-  - script:
-      - ocamlfind install -help
-    requirements:
-      run:
-        - ocaml-compiler
+  - package_contents:
+      strict: true
+      bin:
+        - ocamlfind
+      files:
+        - ${{ library }}etc/findlib.conf
+        - ${{ library }}lib/ocaml/site-lib/bytes/META
+        - ${{ library }}lib/ocaml/site-lib/findlib/META
+        - ${{ library }}lib/ocaml/site-lib/findlib/Makefile.config
+        - ${{ library }}lib/ocaml/site-lib/findlib/Makefile.packages
+        - ${{ library }}lib/ocaml/site-lib/findlib/findlib.cma
+        - ${{ library }}lib/ocaml/site-lib/findlib/findlib.cmxa
+        - ${{ library }}lib/ocaml/site-lib/findlib/findlib_top.cma
+        - ${{ library }}lib/ocaml/site-lib/findlib/findlib*
+        - ${{ library }}lib/ocaml/site-lib/findlib/fl*
+        - ${{ library }}lib/ocaml/site-lib/findlib/ocaml_args.cmi
+        - ${{ library }}lib/ocaml/site-lib/findlib/topfind.cmi
+        - ${{ library }}lib/ocaml/site-lib/findlib/topfind.mli
+        - ${{ library }}share/man/man1/ocamlfind.1
+        - ${{ library }}share/man/man5/META.5
+        - ${{ library }}share/man/man5/findlib.conf.5
+        - ${{ library }}share/man/man5/site-lib.5
+        - ${{ library }}lib/ocaml/topfind
+
+        - etc/conda/activate.d/ocaml-findlib_activate.${{ sh }}
+        - etc/conda/deactivate.d/ocaml-findlib_deactivate.${{ sh }}
+        - etc/conda/test-files/*
+
+  # Cross-compilation tests (aarch64/ppc64le, run under emulation)
+  - if: unix and (build_platform != target_platform)
+    then:
+      script:
+        - bash testing/test_cross.sh
+      requirements:
+        run:
+          - file
+          - ocaml-compiler
+      files:
+        recipe:
+          - testing/test_cross.sh
+
+  # Native Unix tests (Linux/macOS): full driver, native codegen and topfind
+  - if: unix and (build_platform == target_platform)
+    then:
+      script:
+        - bash testing/test_native.sh
+      requirements:
+        run:
+          - if: linux
+            then:
+              - gcc_${{ target_platform }}
+          - if: osx
+            then:
+              - clang_${{ target_platform }}
+              - lld
+              - llvm-tools
+          - grep
+          - ocaml-compiler
+      files:
+        recipe:
+          - testing/test_native.sh
+
+  # non-unix tests (Python - cross-platform, robust)
+  - if: not unix
+    then:
+      script:
+        - python testing/test-findlib.py
+      requirements:
+        run:
+          - if: c_compiler != "gcc"
+            then:
+              - ${{ compiler('c') }}
+          - python >=3.9
+          - ocaml-compiler
+      files:
+        recipe:
+          - testing/test-findlib.py
 
 about:
   homepage: http://projects.camlcity.org/projects/findlib.html

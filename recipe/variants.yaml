@@ -1,0 +1,5 @@
+c_compiler:
+  - if: not unix
+    then:
+      - vs2022
+      - gcc
