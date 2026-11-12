@@ -26,8 +26,9 @@ fi
 
 sed -i "s@${BUILD_PREFIX}@${PREFIX}@g" "${PREFIX}"/etc/findlib.conf "${PREFIX}"/lib/ocaml/site-lib/findlib/Makefile.config
 
-for CHANGE in "activate" "deactivate"
-do
-  mkdir -p "${PREFIX}/etc/conda/${CHANGE}.d"
-  cp "${RECIPE_DIR}/scripts/${CHANGE}.sh" "${PREFIX}/etc/conda/${CHANGE}.d/${PKG_NAME}_${CHANGE}.sh"
-done
+mkdir -p "${PREFIX}/etc/conda/env_vars.d"
+cat > "${PREFIX}/etc/conda/env_vars.d/${PKG_NAME}.json" << EOF
+{
+  "OCAMLFIND_CONF": "${PREFIX}/etc/findlib.conf"
+}
+EOF

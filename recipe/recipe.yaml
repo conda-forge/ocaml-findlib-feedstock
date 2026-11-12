@@ -1,5 +1,5 @@
 context:
-  build_number: 0
+  build_number: 1
   name: ocaml-findlib
   version: 1.9.8
 
@@ -43,6 +43,7 @@ requirements:
 
 tests:
   - script:
+      - test "$OCAMLFIND_CONF" = "$PREFIX/etc/findlib.conf"
       - ocamlfind install -help
     requirements:
       run:
